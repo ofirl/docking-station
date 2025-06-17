@@ -109,7 +109,7 @@ class AppSettings(BaseSettings, CamelCaseAliasedBaseModel):
     auto_updater: AutoUpdaterSettings = Field(default_factory=AutoUpdaterSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
 
-    privateRegistries: PrivateRegistrySettings = Field()
+    privateRegistries: list[PrivateRegistrySettings] = Field()
 
     node_env: Literal['development', 'production'] = 'development'
     server_port: int = 3001
