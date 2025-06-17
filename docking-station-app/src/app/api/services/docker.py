@@ -13,7 +13,7 @@ from python_on_whales.components.image.cli_wrapper import Image as WhalesImage
 from ..schemas import DockerContainer, DockerImage, DockerStack, MessageDict
 from ..settings import get_app_settings
 from ..utils import subprocess_stream_generator
-from .regctl import get_image_inspect, get_image_remote_digest
+from .regctl import get_image_inspect, get_image_remote_digest, login_to_registry
 
 __all__ = [
     'get_compose_service_container',
@@ -29,6 +29,58 @@ __all__ = [
 logger = getLogger(__name__)
 app_settings = get_app_settings()
 
+def is_login_needed(images: list[WhalesImage]) -> bool:
+    """
+    Check if any of the given images is from a private registry.
+    """
+    for image in images:
+        if any(img.startswith(reg.url) for reg in app_settings.private_registries for img in image.repo_tags if img):
+            return True
+    return False
+
+def get_private_registry_configs(images: list[WhalesImage]):
+    """
+    Get the private registry configurations for the given images.
+    """
+    private_registries = []
+    for image in images:
+        for reg in app_settings.privateRegistries:
+            if any(img.startswith(reg.url) for img in image.repo_tags if img):
+                private_registries.append(reg)
+                break
+    return private_registries
+
+def docker_login_if_needed(client: DockerClient, images: list[WhalesImage]):    
+    if not is_login_needed(images):
+        return
+    
+    # Find the matching registry config
+    regs = get_private_registry_configs(images)
+    if not regs:
+        return
+    
+    for reg in regs:
+        # Login to the private registry
+        logger.info('Logging in to private registry %s', reg.url)
+        password = os.environ.get(reg.credentials.passwordEnv)
+        client.login(
+            registry=reg.url,
+            username=reg.credentials.username,
+            password=password,
+        )
+    return
+
+def regctl_login_if_needed(images: list[WhalesImage]):
+    # login if needed
+    if is_login_needed(images):
+        regs = get_private_registry_configs(images)
+        for reg in regs:
+            logger.info('Logging in to private registry %s', reg.url)
+            login_to_registry(
+                url=reg.url,
+                username=reg.credentials.username,
+                password_env=reg.credentials.passwordEnv,
+            )
 
 async def list_containers(filters: DockerContainerListFilters = None,
                           include_stopped: bool = False,
@@ -130,6 +182,10 @@ async def list_images(repository_or_tag: str = None,
         repository_or_tag=clean_repository_or_tag,
         filters=filters or {},
     )
+
+    # login if needed
+    regctl_login_if_needed(_images)
+
     images = await asyncio.gather(*[
         _task(item)
         for item in _images
@@ -254,25 +310,8 @@ async def update_compose_stack(stack_name: str,
         compose_env_file=env_file,
     )
 
-    # Check if any service image is from a private registry
-    private_registries = [r.url for r in app_settings.privateRegistries]
     service_images = [client.image.inspect(container.image) for container in client.compose.ps()]
-
-    needs_login = any(
-        any(img.startswith(reg) for reg in private_registries)
-        for img in service_images if img
-    )
-
-    if needs_login:
-        # Find the matching registry config
-        for reg in app_settings.privateRegistries:
-            if any(img.startswith(reg.url) for img in service_images if img):
-                password = os.environ.get(reg.credentials.passwordEnv)
-                client.login(
-                    registry=reg.url,
-                    username=reg.credentials.username,
-                    password=password,
-                )
+    docker_login_if_needed(client, service_images)
 
     if restart_containers:
         logger.info('Pulling images and restarting containers for %s%s',
