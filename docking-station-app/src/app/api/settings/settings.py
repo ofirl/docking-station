@@ -84,11 +84,32 @@ class ServerSettings(BaseSettings, CamelCaseAliasedBaseModel):
         return value
 
 
+class CredentialsSettings(BaseSettings, CamelCaseAliasedBaseModel):
+    model_config = SettingsConfigDict(env_prefix='CREDENTIALS_')
+
+    username: str = None
+    passwordEnv: str = None
+
+    @field_validator('username', 'passwordEnv', mode='before')
+    @classmethod
+    def validate_str(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+    
+class PrivateRegistrySettings(BaseSettings, CamelCaseAliasedBaseModel):
+    model_config = SettingsConfigDict(env_prefix='REGISTRY_')
+
+    url: str = Field()
+    credentials: CredentialsSettings = Field(default_factory=CredentialsSettings)
+
 class AppSettings(BaseSettings, CamelCaseAliasedBaseModel):
     model_config = SettingsConfigDict(yaml_file='/app/config/settings.yml')
 
     auto_updater: AutoUpdaterSettings = Field(default_factory=AutoUpdaterSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+
+    privateRegistries: PrivateRegistrySettings = Field()
 
     node_env: Literal['development', 'production'] = 'development'
     server_port: int = 3001

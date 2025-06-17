@@ -1,3 +1,4 @@
+import os
 import asyncio
 from datetime import datetime
 from logging import getLogger
@@ -252,6 +253,26 @@ async def update_compose_stack(stack_name: str,
         compose_files=config_files,
         compose_env_file=env_file,
     )
+
+    # Check if any service image is from a private registry
+    private_registries = [r.url for r in app_settings.privateRegistries]
+    service_images = [client.image.inspect(container.image) for container in client.compose.ps()]
+
+    needs_login = any(
+        any(img.startswith(reg) for reg in private_registries)
+        for img in service_images if img
+    )
+
+    if needs_login:
+        # Find the matching registry config
+        for reg in app_settings.privateRegistries:
+            if any(img.startswith(reg.url) for img in service_images if img):
+                password = os.environ.get(reg.credentials.passwordEnv)
+                client.login(
+                    registry=reg.url,
+                    username=reg.credentials.username,
+                    password=password,
+                )
 
     if restart_containers:
         logger.info('Pulling images and restarting containers for %s%s',
