@@ -64,7 +64,7 @@ def docker_login_if_needed(client: DockerClient, images: list[WhalesImage]):
         logger.info('Logging in to private registry %s', reg.url)
         password = os.environ.get(reg.credentials.passwordEnv)
         client.login(
-            registry=reg.url,
+            server=reg.url,
             username=reg.credentials.username,
             password=password,
         )

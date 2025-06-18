@@ -4,7 +4,7 @@ docker buildx create --use --name docking-station-builder || docker buildx use d
 docker buildx inspect --bootstrap
 
 REPO=ghcr.io/ofirl/docking-station  # Replace accordingly
-VERSION=v0.6.0-pre4                         # Replace with your actual version/tag
+VERSION=$1                         # Replace with your actual version/tag
 TAGS="\
   --tag $REPO:$VERSION"
   # --tag $REPO:1.2"                    # Add more tags if needed
