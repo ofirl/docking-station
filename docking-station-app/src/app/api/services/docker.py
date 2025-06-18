@@ -404,6 +404,15 @@ def update_compose_stack_ws(stack_name: str,
             MessageDict(stage='Starting')
         )
 
+        client = DockerClient(
+            compose_files=config_files,
+            compose_env_file=env_file,
+        )
+        docker_login_if_needed(
+            client,
+            [client.image.inspect(container.image) for container in client.compose.ps()]
+        )
+
         config_file_cmd = ['-f', *config_files] if config_files else []
         env_file_cmd = ['--env-file', env_file] if env_file else []
         pull_cmd = ['--pull', 'always'] if not app_settings.server.dryrun else []
