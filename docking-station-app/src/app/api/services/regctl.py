@@ -98,3 +98,20 @@ async def get_image_inspect(repo_tag: str, reraise: bool = False, no_cache: bool
         repo_tag=repo_tag,
         no_cache=False if is_specific_digest else no_cache,
     )
+
+def login_to_registry(
+    url: str,
+    username: str = None,
+    password_env: str = None
+):
+    cmd = f'echo "${password_env}" | regctl registry login {url} -u "{username}" --pass-stdin'
+    process = subprocess.run(
+        cmd,
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    if process.returncode != 0:
+        error_message = process.stderr.decode().strip()
+        raise Exception(f'Error running regctl command: {error_message}')
