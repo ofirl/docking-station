@@ -44,7 +44,7 @@ def get_private_registry_configs(images: list[WhalesImage]):
     """
     private_registries = []
     for image in images:
-        for reg in app_settings.privateRegistries:
+        for reg in app_settings.private_registries:
             if any(img.startswith(reg.url) for img in image.repo_tags if img):
                 private_registries.append(reg)
                 break
